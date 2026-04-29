@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Forensic Investigation Report — NIST CFReDS Data Leakage</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2128;
+  --border: #30363d;
+  --red: #f85149;
+  --amber: #e3b341;
+  --green: #3fb950;
+  --blue: #58a6ff;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+  --nav-h: 56px;
+}
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  padding-top: var(--nav-h);
+}
+
+/* ===== PROGRESS BAR ===== */
+#progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px;
+  background: var(--blue); width: 0%; z-index: 9999;
+  transition: width 0.1s linear;
+}
+
+/* ===== NAV ===== */
+#top-nav {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h);
+  background: rgba(13,17,23,0.95); border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px); z-index: 1000;
+  display: flex; align-items: center; padding: 0 1rem;
+  gap: 0.5rem; overflow-x: auto;
+}
+#top-nav a {
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
+  text-decoration: none; padding: 0.35rem 0.6rem; border-radius: 4px;
+  white-space: nowrap; transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+#top-nav a:hover { color: var(--text); background: var(--surface2); }
+#top-nav a.active { color: var(--blue); background: rgba(88,166,255,0.12); }
+#nav-toggle {
+  display: none; background: none; border: 1px solid var(--border);
+  color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px;
+  cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.nav-brand {
+  font-family: var(--font-mono); font-size: 0.8rem; color: var(--red);
+  font-weight: 700; flex-shrink: 0; margin-right: 0.5rem;
+}
+
+/* ===== DARK/LIGHT TOGGLE ===== */
+#theme-toggle {
+  margin-left: auto; flex-shrink: 0;
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); padding: 0.3rem 0.7rem; border-radius: 4px;
+  cursor: pointer; font-size: 0.75rem; font-family: var(--font-mono);
+  transition: color 0.15s;
+}
+#theme-toggle:hover { color: var(--text); }
+
+/* ===== LIGHT MODE ===== */
+body.light {
+  --bg: #f6f8fa; --surface: #ffffff; --surface2: #f0f2f5;
+  --border: #d0d7de; --text: #1f2328; --muted: #636c76;
+}
+body.light #top-nav { background: rgba(246,248,250,0.95); }
+body.light .hero { background: #1a1f26 !important; }
+
+/* ===== LAYOUT ===== */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+section { padding: 3.5rem 0 2rem; border-bottom: 1px solid var(--border); }
+section:last-of-type { border-bottom: none; }
+
+/* ===== HERO ===== */
+.hero {
+  background: #0d1117;
+  padding: 4rem 0 3rem;
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255,255,255,0.018) 2px,
+    rgba(255,255,255,0.018) 4px
+  );
+  pointer-events: none;
+}
+.hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(88,166,255,0.07), transparent);
+  pointer-events: none;
+}
+.hero-inner { position: relative; z-index: 1; }
+.classified-badge {
+  display: inline-block;
+  background: var(--red); color: #fff;
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.08em; padding: 0.3rem 0.9rem; border-radius: 3px;
+  text-transform: uppercase; margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-family: var(--font-mono); font-size: clamp(1.5rem, 4vw, 2.6rem);
+  font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 0.75rem;
+}
+.cursor {
+  display: inline-block; width: 3px; height: 1.1em;
+  background: var(--blue); margin-left: 4px; vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+.hero-subtitle {
+  font-family: var(--font-mono); font-size: 0.95rem; color: var(--blue);
+  margin-bottom: 0.75rem;
+}
+.hero-meta {
+  font-size: 0.85rem; color: var(--muted); font-family: var(--font-mono);
+  margin-bottom: 2.5rem;
+}
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin-top: 1rem;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.1rem 1.2rem;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--blue); }
+.stat-value {
+  font-family: var(--font-mono); font-size: 1.8rem; font-weight: 700;
+  color: var(--blue); line-height: 1;
+}
+.stat-value.green { color: var(--green); }
+.stat-label { font-size: 0.82rem; font-weight: 600; color: var(--text); margin: 0.3rem 0 0.1rem; }
+.stat-sub { font-size: 0.75rem; color: var(--muted); }
+
+/* ===== SECTION HEADERS ===== */
+.section-header {
+  display: flex; align-items: center; gap: 0.75rem;
+  cursor: pointer; user-select: none; margin-bottom: 1.5rem;
+}
+.section-header:hover h2 { color: var(--blue); }
+.section-num {
+  font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted);
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 0.2rem 0.5rem; border-radius: 4px; flex-shrink: 0;
+}
+h2 {
+  font-family: var(--font-mono); font-size: 1.4rem;
+  font-weight: 700; color: var(--text); transition: color 0.15s;
+}
+h3 { font-family: var(--font-mono); font-size: 1.05rem; color: var(--amber); margin: 1.5rem 0 0.75rem; }
+.collapse-icon {
+  margin-left: auto; font-size: 1rem; color: var(--muted); transition: transform 0.2s;
+}
+.collapsed .collapse-icon { transform: rotate(-90deg); }
+.section-body { transition: all 0.2s; }
+.section-body.hidden { display: none; }
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1.4rem 1.5rem; margin-bottom: 1rem;
+}
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.info-box {
+  background: var(--surface2); border-left: 3px solid var(--blue);
+  border-radius: 0 6px 6px 0; padding: 1rem 1.2rem;
+  font-size: 0.9rem; margin: 1rem 0; line-height: 1.7;
+}
+.info-box.amber { border-left-color: var(--amber); }
+.info-box.red { border-left-color: var(--red); }
+.info-box.green { border-left-color: var(--green); }
+.info-box p { margin-bottom: 0.5rem; }
+.info-box p:last-child { margin-bottom: 0; }
+
+/* ===== TABLES ===== */
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin: 1rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+thead tr { background: var(--surface2); }
+th {
+  font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 0.7rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+  cursor: pointer; white-space: nowrap; user-select: none;
+}
+th:hover { color: var(--text); }
+th.sort-asc::after { content: ' ↑'; color: var(--blue); }
+th.sort-desc::after { content: ' ↓'; color: var(--blue); }
+th[scope="col"] { position: relative; }
+td {
+  padding: 0.65rem 1rem; border-bottom: 1px solid var(--border);
+  vertical-align: top; line-height: 1.5;
+}
+tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+code {
+  font-family: var(--font-mono); font-size: 0.82em;
+  background: rgba(88,166,255,0.1); color: var(--blue);
+  padding: 0.1em 0.4em; border-radius: 3px;
+}
+.badge {
+  display: inline-block; font-family: var(--font-mono);
+  font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem;
+  border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.badge.red { background: rgba(248,81,73,0.2); color: var(--red); }
+.badge.green { background: rgba(63,185,80,0.2); color: var(--green); }
+.badge.amber { background: rgba(227,179,65,0.2); color: var(--amber); }
+.badge.blue { background: rgba(88,166,255,0.2); color: var(--blue); }
+.check { color: var(--green); font-weight: 700; }
+.warn { color: var(--amber); font-weight: 700; }
+.danger { color: var(--red); font-weight: 700; }
+
+/* ===== SUSPECT PROFILE ===== */
+.profile-card {
+  background: var(--surface); border: 1px solid var(--red);
+  border-radius: 8px; padding: 1.5rem; display: flex; gap: 1.5rem;
+  margin: 1rem 0; flex-wrap: wrap;
+}
+.profile-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, #2d1515, #5a1515);
+  border: 2px solid var(--red); display: flex; align-items: center;
+  justify-content: center; font-size: 1.8rem; flex-shrink: 0;
+}
+.profile-info { flex: 1; min-width: 200px; }
+.profile-info h3 { font-family: var(--font-mono); color: var(--red); margin: 0 0 0.75rem; }
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 1.5rem; }
+.profile-row { font-size: 0.84rem; }
+.profile-key { color: var(--muted); font-size: 0.78rem; }
+
+/* ===== TIMELINE ===== */
+.timeline { position: relative; padding-left: 2.5rem; }
+.timeline::before {
+  content: ''; position: absolute; left: 0.7rem; top: 0; bottom: 0;
+  width: 2px; background: linear-gradient(to bottom, var(--blue), var(--red), var(--amber));
+}
+.timeline-day { margin-bottom: 2rem; }
+.timeline-day-label {
+  font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700;
+  color: var(--amber); background: var(--surface); border: 1px solid var(--amber);
+  display: inline-block; padding: 0.3rem 0.9rem; border-radius: 20px;
+  margin-bottom: 1rem; position: relative; left: -1.8rem;
+}
+.timeline-event {
+  position: relative; margin-bottom: 0.5rem; padding: 0.5rem 0.75rem;
+  border-radius: 6px; font-size: 0.88rem; display: flex; align-items: flex-start; gap: 0.6rem;
+}
+.timeline-event:hover { background: var(--surface2); }
+.timeline-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  margin-top: 0.35rem; position: relative; left: -2.2rem;
+  box-shadow: 0 0 6px currentColor;
+}
+.timeline-dot.blue { background: var(--blue); color: var(--blue); }
+.timeline-dot.red { background: var(--red); color: var(--red); }
+.timeline-dot.amber { background: var(--amber); color: var(--amber); }
+.timeline-time {
+  font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted);
+  flex-shrink: 0; margin-top: 0.05rem; min-width: 3.5rem;
+}
+.timeline-text { flex: 1; }
+.timeline-installed {
+  font-size: 0.8rem; color: var(--muted); font-style: italic;
+  border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.5rem;
+}
+
+/* ===== CHIPS ===== */
+.chip-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
+.chip {
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
+  padding: 0.3rem 0.75rem; border-radius: 20px; cursor: default;
+}
+.chip.red { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.35); }
+.chip.amber { background: rgba(227,179,65,0.15); color: var(--amber); border: 1px solid rgba(227,179,65,0.35); }
+.chip.gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+/* ===== EMAIL THREAD ===== */
+.email-thread { display: flex; flex-direction: column; gap: 1rem; margin: 1rem 0; }
+.email-msg {
+  max-width: 72%; padding: 0.9rem 1.1rem;
+  border-radius: 12px; font-size: 0.88rem; line-height: 1.6;
+}
+.email-msg.incoming {
+  align-self: flex-start; background: var(--surface2);
+  border: 1px solid var(--border); border-bottom-left-radius: 3px;
+}
+.email-msg.outgoing {
+  align-self: flex-end; background: rgba(63,185,80,0.1);
+  border: 1px solid rgba(63,185,80,0.3); border-bottom-right-radius: 3px;
+}
+.email-msg.deleted {
+  background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3);
+  align-self: flex-start; border-bottom-left-radius: 3px;
+}
+.email-msg.deleted-out {
+  background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3);
+  align-self: flex-end; border-bottom-right-radius: 3px;
+}
+.email-header {
+  font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
+  margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+}
+.email-from { font-weight: 700; color: var(--text); }
+.email-subject { color: var(--amber); }
+.email-link { color: var(--blue); font-size: 0.78rem; word-break: break-all; display: block; margin-top: 0.25rem; }
+.deleted-badge {
+  display: inline-block; background: rgba(248,81,73,0.25);
+  color: var(--red); font-family: var(--font-mono); font-size: 0.65rem;
+  font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 3px;
+  text-transform: uppercase; vertical-align: middle;
+}
+
+/* ===== FILE RENAME TABLE ===== */
+.rename-grid {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  gap: 0.5rem 0.75rem; align-items: center; margin: 1rem 0;
+}
+.rename-orig {
+  font-family: var(--font-mono); font-size: 0.8rem;
+  color: var(--red); background: rgba(248,81,73,0.08);
+  border: 1px solid rgba(248,81,73,0.2); padding: 0.35rem 0.65rem;
+  border-radius: 5px; word-break: break-all;
+}
+.rename-arrow { color: var(--muted); font-size: 1.1rem; text-align: center; }
+.rename-new {
+  font-family: var(--font-mono); font-size: 0.8rem;
+  color: var(--muted); background: var(--surface2);
+  border: 1px solid var(--border); padding: 0.35rem 0.65rem;
+  border-radius: 5px; word-break: break-all;
+}
+
+/* ===== EVIDENCE TABLE SEARCH ===== */
+.search-wrap { margin-bottom: 1rem; }
+#evidence-search {
+  width: 100%; padding: 0.6rem 1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-family: var(--font-mono);
+  font-size: 0.85rem; outline: none; transition: border-color 0.15s;
+}
+#evidence-search:focus { border-color: var(--blue); }
+#evidence-search::placeholder { color: var(--muted); }
+
+/* ===== GLOSSARY ===== */
+.glossary-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.85rem; margin: 1rem 0;
+}
+.glossary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 7px; padding: 1rem 1.1rem; transition: border-color 0.2s;
+}
+.glossary-card:hover { border-color: var(--blue); }
+.glossary-term {
+  font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700;
+  color: var(--blue); margin-bottom: 0.4rem;
+}
+.glossary-def { font-size: 0.84rem; color: var(--muted); line-height: 1.55; }
+
+/* ===== BACK TO TOP ===== */
+#back-to-top {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  background: var(--blue); color: #0d1117; border: none;
+  width: 42px; height: 42px; border-radius: 50%;
+  font-size: 1.1rem; cursor: pointer; display: none;
+  align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(88,166,255,0.35); z-index: 500;
+  transition: opacity 0.2s; font-weight: 700;
+}
+#back-to-top.visible { display: flex; }
+#back-to-top:hover { opacity: 0.85; }
+
+/* ===== FOOTER ===== */
+footer {
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 2.5rem 0; text-align: center; font-size: 0.85rem; color: var(--muted);
+}
+footer strong { color: var(--text); }
+footer .footer-title {
+  font-family: var(--font-mono); font-size: 0.95rem;
+  color: var(--text); font-weight: 700; margin-bottom: 0.5rem;
+}
+footer p { margin-bottom: 0.3rem; }
+footer .copyright {
+  margin-top: 1rem; padding-top: 1rem;
+  border-top: 1px solid var(--border); font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  #top-nav { flex-wrap: wrap; height: auto; padding: 0.5rem; }
+  #nav-links { display: none; flex-wrap: wrap; gap: 0.25rem; width: 100%; }
+  #nav-links.open { display: flex; }
+  #nav-toggle { display: block; }
+  .card-grid { grid-template-columns: 1fr; }
+  .profile-grid { grid-template-columns: 1fr; }
+  .rename-grid { grid-template-columns: 1fr; }
+  .rename-arrow { transform: rotate(90deg); }
+  .email-msg { max-width: 90%; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .timeline { padding-left: 2rem; }
+}
+
+/* ===== PRINT ===== */
+@media print {
+  * { color: #000 !important; background: #fff !important; border-color: #ccc !important; }
+  #top-nav, #back-to-top, #progress-bar, #theme-toggle, #nav-toggle { display: none !important; }
+  body { padding-top: 0; font-size: 12px; }
+  .hero { background: #fff !important; }
+  .hero::before, .hero::after { display: none; }
+  .cursor { display: none; }
+  .stat-card, .card, .glossary-card { border: 1px solid #ccc !important; page-break-inside: avoid; }
+  section { page-break-inside: avoid; border-bottom: 1px solid #ccc !important; }
+  .section-body.hidden { display: block !important; }
+  table { page-break-inside: avoid; font-size: 11px; }
+  .chip { border: 1px solid #999 !important; }
+  code { background: #eee !important; color: #000 !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress-bar" role="progressbar" aria-label="Reading progress"></div>
+
+<!-- NAV -->
+<nav id="top-nav" aria-label="Main navigation">
+  <span class="nav-brand">&#x1F50D; FORENSIC</span>
+  <button id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776; Menu</button>
+  <div id="nav-links">
+    <a href="#hero">&#x2302; Home</a>
+    <a href="#s1">1. Overview</a>
+    <a href="#s2">2. System</a>
+    <a href="#s3">3. Accounts</a>
+    <a href="#s4">4. Timeline</a>
+    <a href="#s5">5. Searches</a>
+    <a href="#s6">6. Emails</a>
+    <a href="#s7">7. Apps</a>
+    <a href="#s8">8. Exfiltration</a>
+    <a href="#s9">9. Files</a>
+    <a href="#s10">10. Evidence</a>
+    <a href="#s11">11. Glossary</a>
+  </div>
+  <button id="theme-toggle" aria-label="Toggle dark/light mode">&#9788; Light</button>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="hero">
+  <div class="container hero-inner">
+    <div class="classified-badge">Confidential &mdash; For Educational Use Only</div>
+    <h1>Digital Forensic Investigation Report<span class="cursor" aria-hidden="true"></span></h1>
+    <p class="hero-subtitle">NIST CFReDS &mdash; Data Leakage Case | PC Disk Image Analysis</p>
+    <p class="hero-meta">Examiner: Loren Ben-David &nbsp;|&nbsp; Date: April 2026 &nbsp;|&nbsp; Tools: Sleuth Kit (CLI) &nbsp;|&nbsp; Format: DD Image</p>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">4</div>
+        <div class="stat-label">Active Days</div>
+        <div class="stat-sub">Mar 22&ndash;25, 2015</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">24</div>
+        <div class="stat-label">Files Stolen</div>
+        <div class="stat-sub">Disguised with fake names</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">3</div>
+        <div class="stat-label">Exfiltration Methods</div>
+        <div class="stat-sub">Cloud &middot; USB &middot; CD-R</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">4</div>
+        <div class="stat-label">Deleted Emails Recovered</div>
+        <div class="stat-sub">Conspiracy confirmed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">2</div>
+        <div class="stat-label">Anti-Forensic Tools</div>
+        <div class="stat-sub">Eraser + CCleaner</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green">&#10003; PASS</div>
+        <div class="stat-label">Hash Verification</div>
+        <div class="stat-sub">MD5 &amp; SHA-1 match</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- SECTION 1 — CASE OVERVIEW -->
+<section id="s1">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s1')" role="button" tabindex="0" aria-expanded="true" aria-controls="s1-body">
+      <span class="section-num">01</span>
+      <h2>Case Overview</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s1-body">
+      <div class="info-box">
+        <strong>What is &ldquo;Data Leakage&rdquo;?</strong>
+        <p style="margin-top:0.5rem;">Think of it like this: Imagine your school has a secret recipe book locked in a cabinet. Data leakage is when someone sneaks in, copies all the recipes, and gives them to a competitor school &mdash; without permission. In this case, &ldquo;Iaman Informant&rdquo; was an employee who secretly copied confidential project files and sent them to an outside contact. They then tried to hide their tracks by deleting files and wiping their computer.</p>
+      </div>
+      <div class="profile-card">
+        <div class="profile-avatar" aria-label="Suspect icon">&#128373;</div>
+        <div class="profile-info">
+          <h3>Suspect Profile &mdash; <span class="badge red">Primary Suspect</span></h3>
+          <div class="profile-grid">
+            <div class="profile-row"><div class="profile-key">Full Name</div><div>Iaman Informant</div></div>
+            <div class="profile-row"><div class="profile-key">Account Name</div><div><code>informant</code></div></div>
+            <div class="profile-row"><div class="profile-key">Computer</div><div><code>INFORMANT-PC</code></div></div>
+            <div class="profile-row"><div class="profile-key">Work Email</div><div><code>iaman.informant@nist.gov</code></div></div>
+            <div class="profile-row"><div class="profile-key">Personal Gmail</div><div><code>iaman.informant.personal@gmail.com</code></div></div>
+            <div class="profile-row"><div class="profile-key">Conspirator</div><div><code>spy.conspirator@nist.gov</code></div></div>
+            <div class="profile-row"><div class="profile-key">OS</div><div>Windows 7 Ultimate SP1</div></div>
+            <div class="profile-row"><div class="profile-key">Timezone</div><div>Eastern Standard Time (UTC-5)</div></div>
+            <div class="profile-row"><div class="profile-key">IP Address</div><div><code>10.11.11.129</code></div></div>
+            <div class="profile-row"><div class="profile-key">Last Logon</div><div>2015-03-25 at 14:45:59 UTC</div></div>
+            <div class="profile-row"><div class="profile-key">Last Shutdown</div><div>2015-03-25 at 15:31:05 UTC</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2 — SYSTEM INFORMATION -->
+<section id="s2">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s2')" role="button" tabindex="0" aria-expanded="true" aria-controls="s2-body">
+      <span class="section-num">02</span>
+      <h2>System Information</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s2-body">
+      <div class="card-grid">
+        <!-- Card A -->
+        <div class="card">
+          <h3 style="margin-top:0">&#128273; Disk Image Verification (Q1)</h3>
+          <div class="info-box" style="margin-top:0">A hash is like a fingerprint for a file. If even one byte changes, the fingerprint looks completely different. We verified the disk image was not tampered with.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Algorithm</th><th scope="col">Hash Value</th><th scope="col">Match?</th></tr></thead>
+              <tbody>
+                <tr><td><strong>MD5</strong></td><td><code>a49d1254c873808c58e6f1bcd60b5bde</code></td><td><span class="check">&#10003; YES</span></td></tr>
+                <tr><td><strong>SHA-1</strong></td><td><code>afe5c9ab487bd47a8a9856b1371c2384d44fd785</code></td><td><span class="check">&#10003; YES</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Card B -->
+        <div class="card">
+          <h3 style="margin-top:0">&#128190; Partition Info (Q2)</h3>
+          <div class="info-box" style="margin-top:0">A hard drive can be divided into sections called partitions. Think of them like drawers in a filing cabinet.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">#</th><th scope="col">Boot</th><th scope="col">Type</th><th scope="col">Size</th><th scope="col">Purpose</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>No</td><td>NTFS</td><td>100 MB</td><td>Boot files (system startup)</td></tr>
+                <tr><td>2</td><td><span class="check">Yes</span></td><td>NTFS</td><td>19.9 GB</td><td>Main partition &mdash; Windows + user files</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Card C -->
+        <div class="card">
+          <h3 style="margin-top:0">&#128187; OS Info (Q3)</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
+              <tbody>
+                <tr><td>OS Name</td><td>Windows 7 Ultimate</td></tr>
+                <tr><td>Version</td><td>6.1, Build 7601</td></tr>
+                <tr><td>Service Pack</td><td>SP1</td></tr>
+                <tr><td>Registered Owner</td><td><strong class="danger">informant</strong></td></tr>
+                <tr><td>Install Date</td><td>2015-03-22 at 14:34:26 UTC</td></tr>
+                <tr><td>System Root</td><td><code>C:\Windows</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="info-box amber" style="font-size:0.83rem;margin-top:0.75rem">The registered owner name &ldquo;informant&rdquo; is unusual and forensically significant.</div>
+        </div>
+        <!-- Card D -->
+        <div class="card">
+          <h3 style="margin-top:0">&#127760; Timezone &amp; Network (Q4, Q9)</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Field</th><th scope="col">Value</th></tr></thead>
+              <tbody>
+                <tr><td>Timezone</td><td>Eastern Standard Time</td></tr>
+                <tr><td>UTC Offset</td><td>UTC&minus;05:00 (summer: UTC&minus;04:00)</td></tr>
+                <tr><td>IP Address</td><td><code>10.11.11.129</code></td></tr>
+                <tr><td>Subnet</td><td>255.255.255.0 (/24)</td></tr>
+                <tr><td>Gateway</td><td><code>10.11.11.2</code></td></tr>
+                <tr><td>DHCP Server</td><td><code>10.11.11.254</code></td></tr>
+                <tr><td>Lease Obtained</td><td>2015-03-25 at 15:19:50 UTC</td></tr>
+                <tr><td>Lease Duration</td><td>30 minutes</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 3 — USER ACCOUNTS -->
+<section id="s3">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s3')" role="button" tabindex="0" aria-expanded="true" aria-controls="s3-body">
+      <span class="section-num">03</span>
+      <h2>User Accounts</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s3-body">
+      <p style="color:var(--muted);margin-bottom:1rem;font-size:0.9rem">Think of user accounts like name tags at a party. Each person has their own tag. Here are all the accounts found on this computer.</p>
+      <div class="table-wrap">
+        <table id="accounts-table">
+          <thead>
+            <tr>
+              <th scope="col">Account</th>
+              <th scope="col">RID</th>
+              <th scope="col">Last Logon</th>
+              <th scope="col"># Logons</th>
+              <th scope="col">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong class="danger">informant</strong></td>
+              <td>1000</td>
+              <td>2015-03-25 14:45:59</td>
+              <td><strong class="danger">10</strong></td>
+              <td>Primary suspect &mdash; most active</td>
+            </tr>
+            <tr>
+              <td>ITechTeam</td>
+              <td>1001</td>
+              <td>2015-03-22 15:57:02</td>
+              <td>2</td>
+              <td>Likely support/admin role</td>
+            </tr>
+            <tr>
+              <td>admin11</td>
+              <td>1002</td>
+              <td><span class="badge amber">Never</span></td>
+              <td>0</td>
+              <td>1 failed attempt &mdash; never accessed</td>
+            </tr>
+            <tr>
+              <td>temporary</td>
+              <td>1003</td>
+              <td>2015-03-22 15:55:57</td>
+              <td>1</td>
+              <td>Short-term use only</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="info-box red">
+        <strong>Key Finding:</strong> The <code>informant</code> account logged in <strong>10 times</strong> and was the <strong>LAST</strong> to log in &mdash; 3 days after all other accounts. This places the primary suspect as the most recent active user.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4 — TIMELINE -->
+<section id="s4">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s4')" role="button" tabindex="0" aria-expanded="true" aria-controls="s4-body">
+      <span class="section-num">04</span>
+      <h2>Timeline of Events</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s4-body">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.5rem;font-size:0.83rem">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);margin-right:5px;vertical-align:middle"></span> Normal activity</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:middle"></span> Suspicious / forensically significant</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--amber);margin-right:5px;vertical-align:middle"></span> Anti-forensic / cover-up activity</span>
+      </div>
+      <div class="timeline">
+
+        <!-- DAY 1 -->
+        <div class="timeline-day">
+          <div class="timeline-day-label">DAY 1 &mdash; Sunday, March 22, 2015</div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">10:51</span><span class="timeline-text">Computer started up for the first time</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:00</span><span class="timeline-text">First user logon</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:11</span><span class="timeline-text">Downloaded Internet Explorer 11 installer</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:12</span><span class="timeline-text">Ran IE11 installer</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:28</span><span class="timeline-text">Searched Google for &ldquo;outlook 2013 settings&rdquo;</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">12:00</span><span class="timeline-text">Logged off and shut down</span></div>
+          <div class="timeline-installed">&#128190; Installed: Microsoft Office 2013, Google Chrome 41</div>
+        </div>
+
+        <!-- DAY 2 -->
+        <div class="timeline-day">
+          <div class="timeline-day-label" style="border-color:var(--red);color:var(--red)">DAY 2 &mdash; Monday, March 23, 2015 &mdash; THE PLANNING DAY</div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">13:24</span><span class="timeline-text">System started up, user logged on</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:02</span><span class="timeline-text">Searched: <strong>&ldquo;data leakage methods&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:02</span><span class="timeline-text">Searched: <strong>&ldquo;leaking confidential information&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:03</span><span class="timeline-text">Searched: <strong>&ldquo;information leakage cases&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:05</span><span class="timeline-text">Searched: <strong>&ldquo;intellectual property theft&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:06</span><span class="timeline-text">Searched: <strong>&ldquo;how to leak a secret&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:08</span><span class="timeline-text">Searched: <strong>&ldquo;DLP DRM&rdquo;</strong> (Data Loss Prevention / Digital Rights Management)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:10</span><span class="timeline-text">Searched: <strong>&ldquo;Forensic Email Investigation&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:10</span><span class="timeline-text">Searched: <strong>&ldquo;what is windows system artifacts&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:12</span><span class="timeline-text">Searched: <strong>&ldquo;windows event logs&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:13</span><span class="timeline-text">Searched: <strong>&ldquo;cd burning method in windows&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:14</span><span class="timeline-text">Searched: <strong>&ldquo;external device and forensics&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:17</span><span class="timeline-text">Searched: <strong>&ldquo;anti-forensics&rdquo;</strong> &mdash; visited forensicswiki.org/wiki/Anti-forensic_techniques</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">14:24</span><span class="timeline-text">Searched cloud storage, visited iCloud and Google Drive setup pages</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:41</span><span class="timeline-text">Windows Explorer search: <strong>&ldquo;secret&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:24</span><span class="timeline-text">Browsed company network drive <code>\\10.11.11.128\secured_drive</code> &mdash; accessed all Secret Project Data subfolders</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:26</span><span class="timeline-text"><strong>Opened</strong> <code>(secret_project)_pricing_decision.xlsx</code> from network drive</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:27</span><span class="timeline-text"><strong>Opened</strong> <code>[secret_project]_final_meeting.pptx</code> from network drive</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:30&ndash;16:41</span><span class="timeline-text">Renamed 4 secret project files with innocent-sounding names on Desktop</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">20:41</span><span class="timeline-text">Sent Google Drive links to <code>spy.conspirator@nist.gov</code> (email later deleted)</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">17:02</span><span class="timeline-text">Logged off and shut down</span></div>
+          <div class="timeline-installed">&#128190; Installed: Apple Application Support, Bonjour, Apple Software Update, <strong>Google Drive</strong></div>
+        </div>
+
+        <!-- DAY 3 -->
+        <div class="timeline-day">
+          <div class="timeline-day-label" style="border-color:var(--red);color:var(--red)">DAY 3 &mdash; Tuesday, March 24, 2015 &mdash; THE EXFILTRATION DAY</div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">09:21</span><span class="timeline-text">System started up</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">09:47</span><span class="timeline-text">Accessed company network drive again</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">09:49&ndash;09:56</span><span class="timeline-text">Renamed <strong>20 more</strong> secret project files with fake names (disguised as images, music, zip files)</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">09:38</span><span class="timeline-text"><strong>USB Device #1</strong> (SanDisk Cruzer Fit) connected</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">10:00</span><span class="timeline-text">Browsed USB drive contents (<code>E:\Secret Project Data\</code>)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:48</span><span class="timeline-text">Created <strong>Resignation_Letter_(Iaman_Informant).docx</strong> on Desktop</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">14:59</span><span class="timeline-text">Resignation letter saved (final version)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">15:38</span><span class="timeline-text"><strong>USB Device #2</strong> (second SanDisk Cruzer Fit) connected</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">15:47</span><span class="timeline-text"><strong>Burned CD-R #1</strong> (Mastered format) with secret project files</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">15:56</span><span class="timeline-text"><strong>Burned CD-R #2</strong> (Mastered format)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:24</span><span class="timeline-text"><strong>Burned CD-R #3</strong> (Mastered format)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:41</span><span class="timeline-text"><strong>Burned CD-R #4</strong> (Mastered format)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:44</span><span class="timeline-text">Opened burned files from CD to verify contents</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:53</span><span class="timeline-text">Changed CD burning method to &ldquo;Like a USB flash drive&rdquo;</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">16:54&ndash;16:58</span><span class="timeline-text"><strong>Burned 17 confidential files</strong> to CD in USB-style format, then deleted them</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">17:06</span><span class="timeline-text">Searched: <strong>&ldquo;security checkpoint cd-r&rdquo;</strong> (how to bypass physical security)</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">17:07</span><span class="timeline-text">Logged off and shut down</span></div>
+        </div>
+
+        <!-- DAY 4 -->
+        <div class="timeline-day">
+          <div class="timeline-day-label" style="border-color:var(--amber);color:var(--amber)">DAY 4 &mdash; Wednesday, March 25, 2015 &mdash; THE COVER-UP DAY</div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">09:05</span><span class="timeline-text">System started up, final session begins</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">09:51</span><span class="timeline-text">Microsoft .NET Framework installed (required for Eraser)</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">09:57</span><span class="timeline-text"><strong>Eraser 6.2 installed</strong> (secure file deletion tool)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">10:41</span><span class="timeline-text">Outlook opened (likely checking/deleting emails)</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">10:46</span><span class="timeline-text">Searched: <strong>&ldquo;anti-forensic tools&rdquo;</strong>, <strong>&ldquo;eraser&rdquo;</strong>, <strong>&ldquo;ccleaner&rdquo;</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">10:47</span><span class="timeline-text">Downloaded <strong>Eraser 6.2.0.2962.exe</strong> from SourceForge</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">10:48</span><span class="timeline-text">Downloaded <strong>CCleaner</strong> installer</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">10:50</span><span class="timeline-text"><strong>Ran Eraser installer</strong> (confirmed by Prefetch + UserAssist)</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">10:57</span><span class="timeline-text"><strong>Ran CCleaner installer</strong></span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">11:12</span><span class="timeline-text"><strong>Ran Eraser.exe</strong> &mdash; began secure file deletion</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">11:15</span><span class="timeline-text"><strong>Ran CCleaner64.exe</strong> &mdash; began cleaning browser history, temp files, registry</span></div>
+          <div class="timeline-event"><div class="timeline-dot amber" aria-label="Anti-forensic"></div><span class="timeline-time">11:18</span><span class="timeline-text"><strong>Ran CCleaner uninstaller</strong> &mdash; removed CCleaner to hide it was ever used</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:21</span><span class="timeline-text">Google Drive Sync ran</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:22</span><span class="timeline-text">Internet Explorer opened (14 Prefetch hits)</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">11:24</span><span class="timeline-text"><strong>Word opened</strong> &mdash; likely opening the Resignation Letter</span></div>
+          <div class="timeline-event"><div class="timeline-dot red" aria-label="Suspicious"></div><span class="timeline-time">11:28</span><span class="timeline-text"><strong>Printed Resignation Letter</strong> to XPS format (digital paper)</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:30</span><span class="timeline-text">Final logoff</span></div>
+          <div class="timeline-event"><div class="timeline-dot blue" aria-label="Normal"></div><span class="timeline-time">11:31</span><span class="timeline-text"><strong>Computer shut down for the last time</strong></span></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5 — WEB SEARCHES -->
+<section id="s5">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s5')" role="button" tabindex="0" aria-expanded="true" aria-controls="s5-body">
+      <span class="section-num">05</span>
+      <h2>Web Searches &amp; Browser History</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s5-body">
+      <div class="info-box">The browser history is like a diary of what someone was thinking and planning. Here are the most important searches made on this computer.</div>
+
+      <h3>&#128308; Suspicious Searches</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem">Searches indicating planning and intent:</p>
+      <div class="chip-group">
+        <span class="chip red">data leakage methods</span>
+        <span class="chip red">leaking confidential information</span>
+        <span class="chip red">information leakage cases</span>
+        <span class="chip red">intellectual property theft</span>
+        <span class="chip red">how to leak a secret</span>
+        <span class="chip red">DLP DRM</span>
+        <span class="chip red">cd burning method in windows</span>
+        <span class="chip red">external device and forensics</span>
+        <span class="chip red">digital forensics</span>
+        <span class="chip red">how to delete data</span>
+        <span class="chip red">anti-forensics</span>
+        <span class="chip red">security checkpoint cd-r</span>
+        <span class="chip red">anti-forensic tools</span>
+        <span class="chip red">eraser</span>
+        <span class="chip red">ccleaner</span>
+      </div>
+
+      <h3>&#128993; Investigation-Aware Searches</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem">Searches showing the suspect knew they were being (or might be) investigated:</p>
+      <div class="chip-group">
+        <span class="chip amber">Forensic Email Investigation</span>
+        <span class="chip amber">what is windows system artifacts</span>
+        <span class="chip amber">investigation on windows machine</span>
+        <span class="chip amber">windows event logs</span>
+        <span class="chip amber">e-mail investigation</span>
+      </div>
+
+      <h3>&#9898; Normal Searches</h3>
+      <div class="chip-group">
+        <span class="chip gray">outlook 2013 settings</span>
+        <span class="chip gray">google drive</span>
+        <span class="chip gray">apple icloud</span>
+        <span class="chip gray">internet explorer 11</span>
+        <span class="chip gray">Emmy Noether</span>
+      </div>
+
+      <h3>&#127760; Key Websites Visited</h3>
+      <div class="table-wrap">
+        <table id="websites-table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">URL</th>
+              <th scope="col">Significance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>2015-03-23</td><td><code>forensicswiki.org/wiki/Anti-forensic_techniques</code></td><td>Researching how to hide tracks</td></tr>
+            <tr><td>2015-03-23</td><td><code>google.com &rarr; &ldquo;how to leak a secret&rdquo;</code></td><td>Planning data theft</td></tr>
+            <tr><td>2015-03-23</td><td><code>fbi.gov/investigate/white_collar/ipr</code></td><td>Researching IP theft law</td></tr>
+            <tr><td>2015-03-23</td><td><code>forensicswiki.org/wiki/USB_History_Viewing</code></td><td>Researching USB detection</td></tr>
+            <tr><td>2015-03-25</td><td><code>eraser.heidi.ie</code></td><td>Downloaded Eraser tool</td></tr>
+            <tr><td>2015-03-25</td><td><code>sourceforge.net &rarr; Eraser 6.2.0.2962.exe</code></td><td>Downloaded Eraser</td></tr>
+            <tr><td>2015-03-25</td><td><code>piriform.com/ccleaner/download</code></td><td>Downloaded CCleaner</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 6 — EMAILS -->
+<section id="s6">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s6')" role="button" tabindex="0" aria-expanded="true" aria-controls="s6-body">
+      <span class="section-num">06</span>
+      <h2>Email Communications — The Conspiracy</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s6-body">
+      <div class="info-box">The suspect&rsquo;s email was stored in an Outlook file (.ost) on the computer. Even though some emails were deleted, forensic tools recovered them. Here is the full conversation between the suspect and their conspirator.</div>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;font-size:0.8rem;color:var(--muted);margin:1rem 0">
+        <span>&#9608; <strong style="color:var(--text)">Gray</strong> = spy.conspirator@nist.gov (incoming)</span>
+        <span>&#9608; <strong style="color:var(--green)">Green</strong> = iaman.informant@nist.gov (outgoing)</span>
+        <span>&#9608; <strong style="color:var(--red)">Red</strong> = Deleted &mdash; recovered forensically</span>
+      </div>
+      <div class="email-thread" role="log" aria-label="Email thread">
+
+        <div class="email-msg incoming">
+          <div class="email-header">
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-23 17:29</span>
+            <span class="email-subject">&ldquo;Hello, Iaman&rdquo;</span>
+          </div>
+          How are you doing?
+        </div>
+
+        <div class="email-msg outgoing">
+          <div class="email-header">
+            <span class="email-from">iaman.informant@nist.gov</span>
+            <span>2015-03-23 18:44</span>
+            <span class="email-subject">&ldquo;RE: Hello, Iaman&rdquo;</span>
+          </div>
+          Successfully secured.
+        </div>
+
+        <div class="email-msg incoming">
+          <div class="email-header">
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-23 19:15</span>
+            <span class="email-subject">&ldquo;Good job, buddy.&rdquo;</span>
+          </div>
+          Good, job. I need a more detailed data about this business.
+        </div>
+
+        <div class="email-msg incoming">
+          <div class="email-header">
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-23 19:20</span>
+            <span class="email-subject">&ldquo;RE: Good job, buddy.&rdquo;</span>
+          </div>
+          Okay, I got it. I&rsquo;ll be in touch.
+        </div>
+
+        <div class="email-msg incoming">
+          <div class="email-header">
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-23 19:26</span>
+            <span class="email-subject">&ldquo;Important request&rdquo;</span>
+          </div>
+          I confirmed it. But, I need more data. Do your best.
+        </div>
+
+        <div class="email-msg outgoing">
+          <div class="email-header">
+            <span class="email-from">iaman.informant@nist.gov</span>
+            <span>2015-03-23 19:27</span>
+            <span class="email-subject">&ldquo;RE: Important request&rdquo;</span>
+          </div>
+          Umm..... I need time to think.
+        </div>
+
+        <div class="email-msg incoming">
+          <div class="email-header">
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-24 13:25</span>
+            <span class="email-subject">&ldquo;Last request&rdquo;</span>
+          </div>
+          This is the last request. I want to get the remaining data.
+        </div>
+
+        <div class="email-msg deleted">
+          <div class="email-header">
+            <span class="deleted-badge">DELETED &mdash; RECOVERED</span>
+            <span class="email-from">spy.conspirator@nist.gov</span>
+            <span>2015-03-23 20:41</span>
+            <span class="email-subject">&ldquo;RE: It&rsquo;s me&rdquo;</span>
+          </div>
+          Received Google Drive links from iaman. Links:
+          <span class="email-link">https://drive.google.com/file/d/0Bz0ye6gXtiZaVl8yVU5mWHlGbWc/view</span>
+          <span class="email-link">https://drive.google.com/file/d/0Bz0ye6gXtiZaakx6d3R3c0JmM1U/view</span>
+          <br>spy replies: <em>&ldquo;I got it.&rdquo;</em>
+        </div>
+
+        <div class="email-msg deleted-out">
+          <div class="email-header">
+            <span class="deleted-badge">DELETED &mdash; RECOVERED</span>
+            <span class="email-from">iaman.informant@nist.gov</span>
+            <span>2015-03-24 13:35</span>
+            <span class="email-subject">&ldquo;RE: Last request&rdquo;</span>
+          </div>
+          This is the last time.. (spy had suggested using physical storage devices after cloud transfer proved difficult)
+        </div>
+
+        <div class="email-msg deleted-out">
+          <div class="email-header">
+            <span class="deleted-badge">DELETED &mdash; RECOVERED</span>
+            <span class="email-from">iaman.informant@nist.gov</span>
+            <span>2015-03-24 19:34</span>
+            <span class="email-subject">&ldquo;RE: Watch out!&rdquo;</span>
+          </div>
+          spy warned: <em>&ldquo;USB device may be easily detected. So, try another method.&rdquo;</em><br>iaman replies: <em>&ldquo;I am trying.&rdquo;</em>
+        </div>
+
+        <div class="email-msg deleted-out">
+          <div class="email-header">
+            <span class="deleted-badge">DELETED &mdash; RECOVERED</span>
+            <span class="email-from">iaman.informant@nist.gov</span>
+            <span>2015-03-24 21:05</span>
+            <span class="email-subject">&ldquo;Done&rdquo;</span>
+          </div>
+          <strong>&ldquo;It&rsquo;s done. See you tomorrow.&rdquo;</strong>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 7 — APPS & ANTI-FORENSIC TOOLS -->
+<section id="s7">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s7')" role="button" tabindex="0" aria-expanded="true" aria-controls="s7-body">
+      <span class="section-num">07</span>
+      <h2>Applications &amp; Anti-Forensic Tools</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s7-body">
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem">Here are all the programs installed on the computer, in order of when they were installed. The most important ones are highlighted.</p>
+      <div class="table-wrap">
+        <table id="apps-table">
+          <thead>
+            <tr>
+              <th scope="col">Install Time</th>
+              <th scope="col">Application</th>
+              <th scope="col">Publisher</th>
+              <th scope="col">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>2015-03-22 10:04</td><td>Microsoft Office Professional Plus 2013</td><td>Microsoft</td><td>With OS install</td></tr>
+            <tr><td>2015-03-22 10:11</td><td>Google Chrome 41.0.2272.101</td><td>Google</td><td>Normal browser</td></tr>
+            <tr><td>2015-03-23 15:00</td><td>Apple Application Support 3.0.6</td><td>Apple</td><td>Part of iCloud/iTunes</td></tr>
+            <tr><td>2015-03-23 15:00</td><td>Bonjour 3.0.0.10</td><td>Apple</td><td>Part of iCloud/iTunes</td></tr>
+            <tr><td>2015-03-23 15:02</td><td><strong class="warn">Google Drive 1.20.8672</strong></td><td>Google</td><td><span class="badge amber">Used to upload stolen files</span></td></tr>
+            <tr><td>2015-03-25 09:51</td><td>Microsoft .NET Framework 4</td><td>Microsoft</td><td>Required for Eraser</td></tr>
+            <tr><td><strong class="danger">2015-03-25 09:57</strong></td><td><strong class="danger">Eraser 6.2.2962</strong></td><td>The Eraser Project</td><td><span class="badge red">&#9888; SECURE DELETE TOOL — used to destroy evidence</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid" style="margin-top:1.5rem">
+        <div class="info-box red" style="border-radius:6px">
+          <strong>What is Eraser?</strong>
+          <p style="margin-top:0.5rem">Eraser is a program that deletes files in a special way. Normal deletion just marks space as &ldquo;available&rdquo; &mdash; the data is still there and can be recovered. Eraser overwrites the data with random ones and zeros multiple times, making it impossible to recover. Using this on the last day of system activity strongly suggests deliberate destruction of evidence.</p>
+        </div>
+        <div class="info-box amber" style="border-radius:6px">
+          <strong>What is CCleaner?</strong>
+          <p style="margin-top:0.5rem">CCleaner is a &ldquo;system cleaning&rdquo; tool that removes browser history, temporary files, and clears Windows registry traces. The suspect installed it, ran it, then <strong>UNINSTALLED it</strong> &mdash; trying to hide the fact it was ever used.</p>
+        </div>
+      </div>
+
+      <h3>&#9201; Key Execution Timeline on 2015-03-25</h3>
+      <div class="table-wrap">
+        <table id="exec-table">
+          <thead><tr><th scope="col">Time</th><th scope="col">Action</th></tr></thead>
+          <tbody>
+            <tr><td>09:51</td><td>.NET Framework installed (Eraser needs it)</td></tr>
+            <tr><td>09:57</td><td>Eraser installed</td></tr>
+            <tr><td>10:41</td><td>Outlook opened</td></tr>
+            <tr><td>10:46</td><td>Searched for &ldquo;eraser&rdquo; and &ldquo;ccleaner&rdquo; in browser</td></tr>
+            <tr><td>10:47</td><td>Eraser installer downloaded</td></tr>
+            <tr><td>10:48</td><td>CCleaner installer downloaded</td></tr>
+            <tr><td>10:50</td><td>Eraser launched</td></tr>
+            <tr><td>10:57</td><td>CCleaner launched</td></tr>
+            <tr><td>11:12</td><td><strong class="danger">Eraser.exe ran &mdash; files being deleted</strong></td></tr>
+            <tr><td>11:15</td><td><strong class="danger">CCleaner64.exe ran &mdash; cleaning traces</strong></td></tr>
+            <tr><td>11:18</td><td><strong class="warn">CCleaner UNINSTALLER ran &mdash; hiding CCleaner itself</strong></td></tr>
+            <tr><td>11:28</td><td>Resignation letter printed</td></tr>
+            <tr><td>11:31</td><td><strong>Computer shut down forever</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 8 — DATA EXFILTRATION -->
+<section id="s8">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s8')" role="button" tabindex="0" aria-expanded="true" aria-controls="s8-body">
+      <span class="section-num">08</span>
+      <h2>Data Exfiltration Methods</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s8-body">
+      <div class="info-box">The suspect used <strong>THREE different methods</strong> to steal the files. Using multiple methods is a sign of careful planning.</div>
+
+      <!-- Method 1 -->
+      <div class="card">
+        <h3 style="margin-top:0;color:var(--blue)">&#9729; Method 1 &mdash; Google Drive (Cloud)</h3>
+        <div class="info-box" style="margin-top:0">Google Drive is like a cloud locker &mdash; files uploaded there can be accessed from anywhere in the world.</div>
+        <ul style="font-size:0.9rem;padding-left:1.25rem;line-height:2">
+          <li>Installed Google Drive on 2015-03-23</li>
+          <li>Used <strong>PERSONAL</strong> Gmail account (<code>iaman.informant.personal@gmail.com</code>) &mdash; not the work account &mdash; making it harder to trace</li>
+          <li>Two files uploaded and shared via links:
+            <ul>
+              <li><code>happy_holiday.jpg</code> (actually <code>(secret_project)_pricing_decision.xlsx</code>)</li>
+              <li><code>do_u_wanna_build_a_snow_man.mp3</code> (actually <code>[secret_project]_final_meeting.pptx</code>)</li>
+            </ul>
+          </li>
+          <li>Links shared with <code>spy.conspirator@nist.gov</code> via deleted email</li>
+          <li>sync_config.db and snapshot.db databases were deleted by CCleaner &mdash; but recovered from disk</li>
+        </ul>
+      </div>
+
+      <!-- Method 2 -->
+      <div class="card">
+        <h3 style="margin-top:0;color:var(--amber)">&#128190; Method 2 &mdash; USB Flash Drives</h3>
+        <div class="info-box amber" style="margin-top:0">USB drives are small physical storage devices, like tiny portable hard drives.</div>
+        <p style="font-size:0.88rem;margin-bottom:0.75rem">Two SanDisk Cruzer Fit USB drives were connected:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Device</th><th scope="col">Serial Number</th><th scope="col">Connected At</th></tr></thead>
+            <tbody>
+              <tr><td>USB #1</td><td><code>4C530012450531101593</code></td><td>2015-03-24 at 09:38 EDT</td></tr>
+              <tr><td>USB #2</td><td><code>4C530012550531106501</code></td><td>2015-03-24 at 15:38 EDT</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="info-box amber" style="font-size:0.85rem;margin-top:0.75rem">
+          &#9888; The spy warned: <em>&ldquo;USB device may be easily detected. So, try another method.&rdquo;</em> &mdash; USB #2 was connected just 5 minutes after this warning email was sent.
+        </div>
+        <p style="font-size:0.88rem;margin-top:0.75rem">ShellBag evidence confirms the suspect browsed <code>E:\Secret Project Data\</code> with all 5 subfolders on the USB drive.</p>
+      </div>
+
+      <!-- Method 3 -->
+      <div class="card">
+        <h3 style="margin-top:0;color:var(--red)">&#128191; Method 3 &mdash; CD-R Disc Burning</h3>
+        <div class="info-box red" style="margin-top:0">A CD-R is a disc you can write files to &mdash; like a permanent, physical copy.</div>
+        <p style="font-size:0.88rem;margin-bottom:0.75rem">The suspect researched CD burning on March 23 and 24, then burned multiple discs on March 24:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Time</th><th scope="col">Method</th><th scope="col">Contents</th></tr></thead>
+            <tbody>
+              <tr><td>15:47</td><td>Type 2 &mdash; Mastered (standard CD)</td><td>Secret project files</td></tr>
+              <tr><td>15:56</td><td>Type 2 &mdash; Mastered</td><td>Decoy files (photos, IE11 installer)</td></tr>
+              <tr><td>16:24</td><td>Type 2 &mdash; Mastered</td><td>Secret project files</td></tr>
+              <tr><td>16:41</td><td>Type 2 &mdash; Mastered</td><td>Secret project files</td></tr>
+              <tr><td>16:54&ndash;16:58</td><td>Type 1 &mdash; USB-style</td><td><strong class="danger">17 confidential files, then deleted from disc</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="info-box red" style="font-size:0.85rem;margin-top:0.75rem">The decoy session burned innocent-looking files (Chrysanthemum.jpg, Desert.jpg, Jellyfish.jpg, etc.) &mdash; likely to make the CD look harmless at a security checkpoint. The suspect searched &ldquo;security checkpoint cd-r&rdquo; on March 24.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 9 — FILE RENAMING -->
+<section id="s9">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s9')" role="button" tabindex="0" aria-expanded="true" aria-controls="s9-body">
+      <span class="section-num">09</span>
+      <h2>File Renaming &mdash; Disguising the Evidence</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s9-body">
+      <div class="info-box">To avoid being caught, the suspect renamed all the secret files with innocent-sounding names &mdash; like putting a book in a different cover. Here is what each file was really called, and what fake name it was given.</div>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;font-size:0.8rem;color:var(--muted);margin:0.75rem 0 1rem">
+        <span><span style="display:inline-block;width:12px;height:12px;background:rgba(248,81,73,0.25);border:1px solid rgba(248,81,73,0.4);border-radius:3px;margin-right:5px;vertical-align:middle"></span> Original secret filename</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;margin-right:5px;vertical-align:middle"></span> Disguised name given</span>
+      </div>
+      <div class="rename-grid">
+        <div style="font-family:var(--font-mono);font-size:0.72rem;font-weight:700;color:var(--muted);padding:0 0.65rem">Original Filename</div>
+        <div></div>
+        <div style="font-family:var(--font-mono);font-size:0.72rem;font-weight:700;color:var(--muted);padding:0 0.65rem">Disguised As</div>
+
+        <div class="rename-orig"><code>[secret_project]_detailed_proposal.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>landscape.png</code></div>
+        <div class="rename-orig"><code>[secret_project]_design_concept.ppt</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>space_and_earth.mp4</code></div>
+        <div class="rename-orig"><code>(secret_project)_pricing_decision.xlsx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>happy_holiday.jpg</code></div>
+        <div class="rename-orig"><code>[secret_project]_final_meeting.pptx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>do_u_wanna_build_a_snow_man.mp3</code></div>
+        <div class="rename-orig"><code>[secret_project]_detailed_design.pptx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>winter_whether_advisory.zip</code></div>
+        <div class="rename-orig"><code>[secret_project]_revised_points.ppt</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>winter_storm.amr</code></div>
+        <div class="rename-orig"><code>[secret_project]_design_concept.ppt</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>space_and_earth.mp4</code></div>
+        <div class="rename-orig"><code>[secret_project]_final_meeting.pptx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>do_u_wanna_build_a_snow_man.mp3</code></div>
+        <div class="rename-orig"><code>(secret_project)_market_analysis.xlsx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>new_years_day.jpg</code></div>
+        <div class="rename-orig"><code>(secret_project)_market_shares.xls</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><em style="color:var(--muted)">(no new name recorded)</em></div>
+        <div class="rename-orig"><code>(secret_project)_price_analysis_#1.xlsx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>my_favorite_movies.7z</code></div>
+        <div class="rename-orig"><code>(secret_project)_price_analysis_#2.xls</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>my_favorite_cars.db</code></div>
+        <div class="rename-orig"><code>(secret_project)_pricing_decision.xlsx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>happy_holiday.jpg</code></div>
+        <div class="rename-orig"><code>[secret_project]_progress_#1.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>my_smartphone.png</code></div>
+        <div class="rename-orig"><code>[secret_project]_progress_#2.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>new_year_calendar.one</code></div>
+        <div class="rename-orig"><code>[secret_project]_progress_#3.doc</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>my_friends.svg</code></div>
+        <div class="rename-orig"><code>[secret_project]_detailed_proposal.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>a_gift_from_you.gif</code></div>
+        <div class="rename-orig"><code>[secret_project]_proposal.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>landscape.png</code></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#1.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>diary_#1d.txt</code></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#1.pptx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>diary_#1p.txt</code></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#2.docx</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>diary_#2d.txt</code></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#2.ppt</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><code>diary_#2p.txt</code></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#3.doc</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><em style="color:var(--muted)">(no new name recorded)</em></div>
+        <div class="rename-orig"><code>[secret_project]_technical_review_#3.ppt</code></div><div class="rename-arrow">&#8594;</div><div class="rename-new"><em style="color:var(--muted)">(no new name recorded)</em></div>
+      </div>
+      <div class="info-box green" style="margin-top:1.25rem">
+        <strong>&#128247; Thumbcache Evidence:</strong> The Windows thumbnail cache contained visual previews of 6 PowerPoint files even after renaming and deletion &mdash; proving the files existed and were viewed on screen. Subfolders on USB and CD matched exactly: <em>design, final, pricing decision, progress, proposal, technical review</em>.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 10 — EVIDENCE SUMMARY -->
+<section id="s10">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s10')" role="button" tabindex="0" aria-expanded="true" aria-controls="s10-body">
+      <span class="section-num">10</span>
+      <h2>Evidence Summary Table (Q1&ndash;Q40)</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s10-body">
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1rem">Here is a quick summary of all 40 investigation questions answered in this report.</p>
+      <div class="search-wrap">
+        <input type="search" id="evidence-search" placeholder="&#128269; Search questions or findings..." aria-label="Search evidence table">
+      </div>
+      <div class="table-wrap">
+        <table id="evidence-table">
+          <thead>
+            <tr>
+              <th scope="col">Q#</th>
+              <th scope="col">Question</th>
+              <th scope="col">Key Finding</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge blue">Q1</span></td><td>Hash verification</td><td>MD5 &amp; SHA-1 both match &mdash; image is authentic</td></tr>
+            <tr><td><span class="badge blue">Q2</span></td><td>Partition info</td><td>2 NTFS partitions: 100MB boot + 19.9GB main</td></tr>
+            <tr><td><span class="badge blue">Q3</span></td><td>OS info</td><td>Windows 7 Ultimate SP1, registered to &ldquo;informant&rdquo;</td></tr>
+            <tr><td><span class="badge blue">Q4</span></td><td>Timezone</td><td>Eastern Standard Time (UTC-5)</td></tr>
+            <tr><td><span class="badge blue">Q5</span></td><td>Computer name</td><td>INFORMANT-PC</td></tr>
+            <tr><td><span class="badge blue">Q6</span></td><td>User accounts</td><td>4 accounts: informant (10 logons), ITechTeam, admin11, temporary</td></tr>
+            <tr><td><span class="badge blue">Q7</span></td><td>Last logon</td><td>informant &mdash; 2015-03-25 at 14:45:59 UTC</td></tr>
+            <tr><td><span class="badge blue">Q8</span></td><td>Last shutdown</td><td>2015-03-25 at 15:31:05 UTC</td></tr>
+            <tr><td><span class="badge blue">Q9</span></td><td>Network / DHCP</td><td>IP 10.11.11.129, 30-min lease, connected just before shutdown</td></tr>
+            <tr><td><span class="badge amber">Q10</span></td><td>Installed apps</td><td>9 apps including Google Drive, Eraser &mdash; critical finding</td></tr>
+            <tr><td><span class="badge amber">Q11</span></td><td>App execution logs</td><td>Eraser + CCleaner run on final day, CCleaner then self-deleted</td></tr>
+            <tr><td><span class="badge blue">Q12</span></td><td>System on/off logs</td><td>4 sessions: Mar 22&ndash;25. Final session 09:05&ndash;11:31</td></tr>
+            <tr><td><span class="badge blue">Q13</span></td><td>Web browsers</td><td>IE 11 and Chrome 41</td></tr>
+            <tr><td><span class="badge blue">Q14</span></td><td>Browser history paths</td><td>Chrome History SQLite; IE11 WebCacheV01.dat ESE database</td></tr>
+            <tr><td><span class="badge red">Q15</span></td><td>Websites visited</td><td>60+ sites; anti-forensic tools, eraser, data leakage research</td></tr>
+            <tr><td><span class="badge red">Q16</span></td><td>Search keywords</td><td>30+ searches; &ldquo;how to leak a secret&rdquo;, &ldquo;anti-forensics&rdquo;, &ldquo;eraser&rdquo;</td></tr>
+            <tr><td><span class="badge red">Q17</span></td><td>Windows Explorer search</td><td>Keyword &ldquo;secret&rdquo; searched on 2015-03-23</td></tr>
+            <tr><td><span class="badge blue">Q18</span></td><td>Email application</td><td>Microsoft Outlook 2013</td></tr>
+            <tr><td><span class="badge blue">Q19</span></td><td>Email file path</td><td><code>C:\Users\informant\AppData\Local\Microsoft\Outlook\iaman.informant@nist.gov.ost</code></td></tr>
+            <tr><td><span class="badge blue">Q20</span></td><td>Email account</td><td>iaman.informant@nist.gov (Exchange Online / Office 365)</td></tr>
+            <tr><td><span class="badge red">Q21</span></td><td>Email communications</td><td>11 emails (7 normal + 4 deleted): conspiracy confirmed, Google Drive links shared</td></tr>
+            <tr><td><span class="badge red">Q22</span></td><td>USB devices</td><td>2&times; SanDisk Cruzer Fit: connected 09:38 and 15:38 on 2015-03-24</td></tr>
+            <tr><td><span class="badge red">Q23</span></td><td>File renaming</td><td>24 secret project files renamed with innocent names</td></tr>
+            <tr><td><span class="badge blue">Q24</span></td><td>Network drive IP</td><td><code>\\10.11.11.128\secured_drive</code></td></tr>
+            <tr><td><span class="badge red">Q25</span></td><td>USB directories browsed</td><td><code>E:\Secret Project Data\</code> with 5 subfolders</td></tr>
+            <tr><td><span class="badge red">Q26</span></td><td>Files opened on USB</td><td><code>winter_whether_advisory.zip</code> opened (= [secret_project]_detailed_design.pptx)</td></tr>
+            <tr><td><span class="badge red">Q27</span></td><td>Network drive browsing</td><td>Browsed all Secret Project Data subfolders on 2015-03-23</td></tr>
+            <tr><td><span class="badge red">Q28</span></td><td>Files opened from network</td><td>pricing_decision.xlsx and final_meeting.pptx opened directly</td></tr>
+            <tr><td><span class="badge amber">Q29</span></td><td>Cloud traces</td><td>Google Drive + iCloud traces on PC</td></tr>
+            <tr><td><span class="badge amber">Q30</span></td><td>Google Drive deleted files</td><td>happy_holiday.jpg + do_u_wanna_build_a_snow_man.mp3 (IDs match email links)</td></tr>
+            <tr><td><span class="badge amber">Q31</span></td><td>Google Drive account</td><td>iaman.informant.personal@gmail.com (personal, not work account)</td></tr>
+            <tr><td><span class="badge red">Q32</span></td><td>CD burning method</td><td>Windows 7 built-in IMAPI (no 3rd-party software)</td></tr>
+            <tr><td><span class="badge red">Q33</span></td><td>When CD was burned</td><td>4 Mastered sessions + 1 USB-style session on 2015-03-24</td></tr>
+            <tr><td><span class="badge red">Q34</span></td><td>Files burned to CD</td><td>17 secret files (disguised) + 9 decoy files</td></tr>
+            <tr><td><span class="badge red">Q35</span></td><td>Files opened from CD</td><td>Verified burned content on 2015-03-24 at 16:44</td></tr>
+            <tr><td><span class="badge blue">Q36</span></td><td>Resignation file timestamps</td><td>Created 2015-03-24 at 14:48, opened again on 2015-03-25</td></tr>
+            <tr><td><span class="badge blue">Q37</span></td><td>How resignation was printed</td><td>Printed to XPS format at 11:28 on 2015-03-25 (3 min before shutdown)</td></tr>
+            <tr><td><span class="badge blue">Q38</span></td><td>Thumbcache locations</td><td><code>C:\Users\informant\AppData\Local\Microsoft\Windows\Explorer\</code></td></tr>
+            <tr><td><span class="badge amber">Q39</span></td><td>Thumbcache contents</td><td>6 Secret Project PowerPoint thumbnails still visible after renaming</td></tr>
+            <tr><td><span class="badge blue">Q40</span></td><td>Sticky Notes location</td><td><code>C:\Users\informant\AppData\Roaming\Microsoft\Sticky Notes\StickyNotes.snt</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 11 — GLOSSARY -->
+<section id="s11">
+  <div class="container">
+    <div class="section-header" onclick="toggleSection('s11')" role="button" tabindex="0" aria-expanded="true" aria-controls="s11-body">
+      <span class="section-num">11</span>
+      <h2>Glossary of Terms</h2>
+      <span class="collapse-icon" aria-hidden="true">&#9660;</span>
+    </div>
+    <div class="section-body" id="s11-body">
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.25rem">Not sure what something means? Here is a simple explanation of all technical terms used in this report.</p>
+      <div class="glossary-grid">
+        <div class="glossary-card"><div class="glossary-term">Hash / MD5 / SHA-1</div><div class="glossary-def">A unique &ldquo;fingerprint&rdquo; number for a file. If even one byte changes, the fingerprint changes completely. Used to verify the disk image was not tampered with.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Disk Image (DD)</div><div class="glossary-def">An exact copy of an entire hard drive &mdash; like a perfect photograph of all the data.</div></div>
+        <div class="glossary-card"><div class="glossary-term">NTFS</div><div class="glossary-def">The file system Windows uses to organize files on a hard drive (like a filing system).</div></div>
+        <div class="glossary-card"><div class="glossary-term">Partition</div><div class="glossary-def">A section of a hard drive &mdash; like dividing a big room into separate areas.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Registry Hive</div><div class="glossary-def">A special database Windows uses to store all its settings (like a control panel for the whole computer).</div></div>
+        <div class="glossary-card"><div class="glossary-term">DHCP</div><div class="glossary-def">A system that automatically assigns an IP address (a network identity number) to a computer.</div></div>
+        <div class="glossary-card"><div class="glossary-term">IP Address</div><div class="glossary-def">A unique number that identifies a computer on a network &mdash; like a home address for a computer.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Forensic Artifact</div><div class="glossary-def">A digital trace left behind by computer activity &mdash; like footprints in the snow.</div></div>
+        <div class="glossary-card"><div class="glossary-term">USN Journal ($UsnJrnl)</div><div class="glossary-def">A log kept by Windows that records every file create, delete, rename, or modify operation.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Prefetch</div><div class="glossary-def">A Windows feature that records when programs are run, to help them start faster. Also useful for forensics.</div></div>
+        <div class="glossary-card"><div class="glossary-term">UserAssist</div><div class="glossary-def">A hidden Windows record of which programs the user has run, and how many times.</div></div>
+        <div class="glossary-card"><div class="glossary-term">ShellBag</div><div class="glossary-def">A registry record of which folders the user has browsed in Windows Explorer.</div></div>
+        <div class="glossary-card"><div class="glossary-term">JumpList</div><div class="glossary-def">A Windows feature that records recently opened files per application.</div></div>
+        <div class="glossary-card"><div class="glossary-term">LNK file</div><div class="glossary-def">A Windows shortcut file. Created automatically when a file is opened &mdash; reveals file access times.</div></div>
+        <div class="glossary-card"><div class="glossary-term">OST file</div><div class="glossary-def">Outlook&rsquo;s local copy of an email mailbox. Can be analyzed to recover emails.</div></div>
+        <div class="glossary-card"><div class="glossary-term">ESE Database</div><div class="glossary-def">A type of database format used by Windows and IE11 to store browser history and other data.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Thumbcache</div><div class="glossary-def">A cache of small preview images (thumbnails) of files viewed in Windows Explorer. Survives file deletion.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Anti-forensics</div><div class="glossary-def">Techniques used to hide, destroy, or confuse digital evidence &mdash; like erasing footprints.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Eraser</div><div class="glossary-def">A program that permanently destroys files by overwriting them, making recovery impossible.</div></div>
+        <div class="glossary-card"><div class="glossary-term">CCleaner</div><div class="glossary-def">A &ldquo;cleaning&rdquo; program that removes browser history, temp files, and Windows registry entries.</div></div>
+        <div class="glossary-card"><div class="glossary-term">IMAPI</div><div class="glossary-def">Windows&rsquo; built-in CD/DVD burning system.</div></div>
+        <div class="glossary-card"><div class="glossary-term">Google Drive Sync</div><div class="glossary-def">A program that automatically uploads files in a folder to Google&rsquo;s cloud storage.</div></div>
+        <div class="glossary-card"><div class="glossary-term">WAL (Write-Ahead Log)</div><div class="glossary-def">A backup file used by SQLite databases. Even when the main database was deleted, the WAL file retained the data.</div></div>
+        <div class="glossary-card"><div class="glossary-term">MFT ($MFT)</div><div class="glossary-def">Master File Table &mdash; the index of every file on an NTFS partition. Like a library catalog.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="s12">
+  <div class="container">
+    <div class="footer-title">Digital Forensic Investigation Report &mdash; NIST CFReDS Data Leakage Case</div>
+    <p><strong>Examiner:</strong> Loren Ben-David &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Date:</strong> April 2026</p>
+    <p><strong>Tools used:</strong> Sleuth Kit (CLI), hivexsh, python-evtx, pypff, SQLite3, python3</p>
+    <p style="margin-top:0.75rem;color:var(--muted);font-size:0.83rem">This report was created for educational purposes as part of a digital forensics coursework assignment. The case is based on the NIST CFReDS public dataset.</p>
+    <div class="copyright">&copy; 2026 Loren Ben-David. All rights reserved.</div>
+  </div>
+</footer>
+
+<!-- BACK TO TOP -->
+<button id="back-to-top" aria-label="Back to top" title="Back to top">&#8593;</button>
+
+<script>
+// ===== SECTION COLLAPSE =====
+function toggleSection(id) {
+  const body = document.getElementById(id + '-body');
+  const header = body.previousElementSibling;
+  const isHidden = body.classList.toggle('hidden');
+  header.classList.toggle('collapsed', isHidden);
+  header.setAttribute('aria-expanded', !isHidden);
+}
+document.querySelectorAll('.section-header').forEach(h => {
+  h.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h.click(); }
+  });
+});
+
+// ===== NAV MOBILE TOGGLE =====
+const navToggle = document.getElementById('nav-toggle');
+const navLinks = document.getElementById('nav-links');
+navToggle.addEventListener('click', () => {
+  const open = navLinks.classList.toggle('open');
+  navToggle.setAttribute('aria-expanded', open);
+});
+
+// ===== ACTIVE NAV + PROGRESS BAR + BACK-TO-TOP =====
+const sections = document.querySelectorAll('section[id], header[id]');
+const navAnchors = document.querySelectorAll('#nav-links a');
+const progressBar = document.getElementById('progress-bar');
+const backToTop = document.getElementById('back-to-top');
+
+window.addEventListener('scroll', () => {
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  progressBar.style.width = (docHeight > 0 ? (scrollTop / docHeight * 100) : 0) + '%';
+  backToTop.classList.toggle('visible', scrollTop > 400);
+
+  let current = '';
+  sections.forEach(s => {
+    if (scrollTop >= s.offsetTop - 80) current = s.id;
+  });
+  navAnchors.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+}, { passive: true });
+
+backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+// ===== DARK/LIGHT TOGGLE =====
+const themeBtn = document.getElementById('theme-toggle');
+themeBtn.addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  themeBtn.textContent = document.body.classList.contains('light') ? '☾ Dark' : '☀ Light';
+});
+
+// ===== TABLE SORT =====
+function makeSortable(table) {
+  const headers = table.querySelectorAll('th');
+  headers.forEach((th, col) => {
+    th.addEventListener('click', () => {
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const asc = th.classList.contains('sort-asc');
+      headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+      th.classList.add(asc ? 'sort-desc' : 'sort-asc');
+      rows.sort((a, b) => {
+        const aText = (a.cells[col] ? a.cells[col].textContent : '').trim().toLowerCase();
+        const bText = (b.cells[col] ? b.cells[col].textContent : '').trim().toLowerCase();
+        const n = parseFloat(aText) - parseFloat(bText);
+        if (!isNaN(n)) return asc ? -n : n;
+        return asc ? bText.localeCompare(aText) : aText.localeCompare(bText);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  });
+}
+document.querySelectorAll('table').forEach(makeSortable);
+
+// ===== EVIDENCE TABLE SEARCH =====
+const searchInput = document.getElementById('evidence-search');
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase();
+    document.querySelectorAll('#evidence-table tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+</script>
+</body>
+</html>
